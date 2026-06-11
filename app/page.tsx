@@ -1,65 +1,105 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import UploadBox from "@/components/UploadBox";
+import AnalysisResult from "@/components/AnalysisResult";
 
 export default function Home() {
+  const [analysis, setAnalysis] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [query, setQuery] = useState("");
+
+  function handleFileSelect(selectedFile: File) {
+    setFile(selectedFile);
+    setAnalysis(null);
+    const reader = new FileReader();
+    reader.onload = (e) => setPreview(e.target?.result as string);
+    reader.readAsDataURL(selectedFile);
+  }
+
+  async function handleAnalyse() {
+    if (!file) return;
+    setLoading(true);
+    setAnalysis(null);
+
+    const formData = new FormData();
+    formData.append("image", file);
+    if (query.trim()) formData.append("query", query.trim());
+
+    try {
+      const res = await fetch("/api/analyse", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      setAnalysis(data.analysis ?? data.error);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setAnalysis(`ERROR: ${message}`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="min-h-screen bg-[#0a0a0a] text-white">
+      {/* Header */}
+      <div className="border-b border-white/10 px-6 py-4">
+        <div className="max-w-3xl mx-auto flex items-center gap-3">
+          <span className="text-2xl">⚽</span>
+          <div>
+            <h1 className="text-lg font-bold tracking-tight">Tactical Lens</h1>
+            <p className="text-xs text-white/40">AI-powered football analysis</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="max-w-3xl mx-auto px-6 py-10 flex flex-col gap-6">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold mb-2">Drop any match screenshot</h2>
+          <p className="text-white/50 text-sm">
+            Upload a screenshot, heatmap or pass map — then ask anything about it
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        {/* Upload */}
+        <UploadBox onFileSelect={handleFileSelect} loading={loading} hasFile={!!file} />
+
+        {/* Image preview */}
+        {preview && (
+          <div className="rounded-xl overflow-hidden border border-white/10">
+            <img src={preview} alt="Uploaded screenshot" className="w-full object-contain max-h-80" />
+          </div>
+        )}
+
+        {/* Query input */}
+        {file && (
+          <div className="flex flex-col gap-3">
+            <textarea
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`Optional — add context or ask something specific...\n\nExamples:\n• "This is Bellingham's heatmap, compare his movement to a typical #8"\n• "Focus on the pressing patterns in this screenshot"\n• "This is from the WC final, analyse both team shapes"`}
+              rows={4}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 resize-none focus:outline-none focus:border-white/30 transition-colors"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            <button
+              onClick={handleAnalyse}
+              disabled={loading}
+              className="w-full bg-white text-black font-semibold py-3 rounded-xl hover:bg-white/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {loading ? "Analysing..." : "Analyse"}
+            </button>
+          </div>
+        )}
+
+        {/* Result */}
+        {(loading || analysis) && (
+          <AnalysisResult analysis={analysis} loading={loading} />
+        )}
+      </div>
+    </main>
   );
 }
